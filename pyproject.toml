@@ -1,0 +1,17 @@
+[project]
+name = "ssml-demo"
+version = "0.1.0"
+description = "A demo application for SSML generation using Gemini and Edge-TTS/SAPI."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "streamlit>=1.40.0",
+    "google-generativeai>=0.8.0",
+    "keyring>=25.0.0",
+    "keyrings.alt>=5.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

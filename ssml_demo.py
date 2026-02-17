@@ -9,9 +9,15 @@
 
 import streamlit as st
 import google.generativeai as genai
-import subprocess
 import os
+import platform
 import keyring
+from tts_backends import (
+    TTSConfigError,
+    get_tts_backend,
+    diagnose_linux_piper,
+    detect_snap_piper_defaults,
+)
 
 def main():
     st.set_page_config(page_title="SSML Demo", layout="centered")
@@ -27,6 +33,58 @@ def main():
         api_key = st.text_input("Gemini API Key", value=stored_key if stored_key else "", type="password")
         if not api_key:
             st.info("Get your API key from [Google AI Studio](https://aistudio.google.com/)")
+
+        platform_label = platform.system()
+        st.caption(f"Detected platform: {platform_label}")
+
+        backend_env = os.getenv("TTS_BACKEND", "auto")
+        backend_options = ["auto", "windows_sapi", "linux_piper"]
+        backend_index = backend_options.index(backend_env) if backend_env in backend_options else 0
+        backend_choice = st.selectbox("TTS Backend", backend_options, index=backend_index)
+
+        piper_binary = os.getenv("PIPER_BINARY", "piper")
+        piper_model_path = os.getenv("PIPER_MODEL_PATH", "")
+        piper_speaker_id = os.getenv("PIPER_SPEAKER_ID", "")
+
+        linux_active = backend_choice == "linux_piper" or (
+            backend_choice == "auto" and platform_label == "Linux"
+        )
+        if linux_active:
+            if piper_binary == "piper" and not piper_model_path:
+                snap_binary, snap_model = detect_snap_piper_defaults()
+                if snap_binary and snap_model:
+                    piper_binary = snap_binary
+                    piper_model_path = snap_model
+                    st.caption("Detected Piper snap defaults.")
+            piper_binary = st.text_input("Piper Binary", value=piper_binary)
+            piper_model_path = st.text_input("Piper Model Path", value=piper_model_path)
+            piper_speaker_id = st.text_input("Piper Speaker ID (Optional)", value=piper_speaker_id)
+            if st.button("Check Linux Audio"):
+                report = diagnose_linux_piper(piper_binary, piper_model_path)
+                if report["ok"]:
+                    st.success("Linux audio configuration looks ready.")
+                else:
+                    st.warning("Linux audio configuration needs attention.")
+
+                if report["piper_found"]:
+                    st.info(f"Piper binary found: {report['piper_binary']}")
+                else:
+                    st.error(f"Piper binary not found: {report['piper_binary']}")
+
+                if report["model_found"]:
+                    st.info(f"Piper model found: {report['piper_model_path']}")
+                else:
+                    st.error("Piper model not found. Set PIPER_MODEL_PATH.")
+
+                if report["playback_tools"]:
+                    st.info(f"Playback tools available: {', '.join(report['playback_tools'])}")
+                else:
+                    st.error("No playback tools found. Install aplay, paplay, ffplay, or simpleaudio.")
+
+                if report["ssml2piper_available"]:
+                    st.info("ssml2piper available for SSML conversion.")
+                else:
+                    st.warning("ssml2piper not installed. SSML will be stripped to plain text.")
 
         if st.button("Check Available Models"):
             if not api_key:
@@ -91,24 +149,19 @@ def main():
 
             # Speak
             st.status("Speaking on host device...")
-            
-            # PowerShell command to speak SSML
-            # 8 is the flag for SPF_IS_XML
-            ps_code = f"""
-            $voice = New-Object -ComObject SAPI.SpVoice
-            # Try to find an English voice
-            $englishVoice = $voice.GetVoices() | Where-Object {{ $_.GetDescription() -like "*English*" }} | Select-Object -First 1
-            if ($englishVoice) {{
-                $voice.Voice = $englishVoice
-            }}
-            $voice.Speak('{ssml_text.replace("'", "''")}', 8)
-            """
-            
-            # Run PowerShell
-            subprocess.run(["powershell.exe", "-Command", ps_code], check=True)
-            
-        except FileNotFoundError:
-            st.error("powershell.exe not found. This app expects to run in WSL with access to Windows PowerShell.")
+
+            backend = get_tts_backend(
+                {
+                    "backend": backend_choice,
+                    "piper_binary": piper_binary,
+                    "piper_model_path": piper_model_path,
+                    "piper_speaker_id": piper_speaker_id,
+                }
+            )
+            backend.speak(ssml_text)
+
+        except TTSConfigError as e:
+            st.error(str(e))
         except Exception as e:
             st.error(f"An error occurred: {e}")
 

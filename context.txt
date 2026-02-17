@@ -90,3 +90,34 @@ http://googleusercontent.com/immersive_entry_chip/1
 2.  **Created `README.md`**: Detailed instructions on using `uv run` to execute the self-contained script and how to export it using `uv lock`.
 
 You can now simply drop `ssml_demo.py` into your Antigravity project directory and run the `uv` command!
+
+
+CODEX SESSION SUMMARY (2026-02-17):
+===================================
+Goal: Make the SSML demo run on both Windows 11 and Linux.
+
+Key updates:
+- Added cross-platform TTS backend abstraction in `tts_backends.py`:
+  - Windows backend: PowerShell + SAPI.SpVoice.
+  - Linux backend: Piper synthesis with playback fallback order:
+    `simpleaudio` (if installed), then `aplay`, `paplay`, `ffplay`.
+  - Added Linux diagnostics helpers:
+    - `diagnose_linux_piper(...)`
+    - `probe_linux_playback_tools()`
+    - `detect_snap_piper_defaults()` for snap `piper-tts`.
+- Updated `ssml_demo.py`:
+  - Backend selection in UI (`auto`, `windows_sapi`, `linux_piper`).
+  - Linux Piper config inputs and “Check Linux Audio” button.
+  - Auto-detects snap defaults and shows a UI caption when applied.
+- Added `scripts/check_linux_audio.py` for CLI validation.
+- Updated `README.md` with Linux setup, snap auto-detect, audio check script,
+  and optional helpers (`ssml2piper`, `simpleaudio`).
+- Removed hard dependencies on `simpleaudio` and `ssml2piper` from
+  `pyproject.toml` to avoid build/resolution failures.
+
+Runtime notes from this machine:
+- Snap install present at `/snap/piper-tts/1/` with `bin/piper`.
+- Wrapper available at `/snap/bin/piper-tts.piper-cli`.
+- Bundled model at `/snap/piper-tts/1/voices/en_US-lessac-medium.onnx`.
+- `snap list` hangs in this environment, but direct path inspection works.
+- Linux audio check with snap paths returns Status: OK.

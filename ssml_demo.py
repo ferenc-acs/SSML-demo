@@ -1,14 +1,14 @@
 # /// script
 # dependencies = [
 #   "streamlit",
-#   "google-generativeai",
+#   "google-genai",
 #   "keyring",
 #   "keyrings.alt",
 # ]
 # ///
 
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 import os
 import platform
 import keyring
@@ -90,9 +90,9 @@ def main():
             if not api_key:
                 st.error("Please enter an API Key first.")
             else:
-                genai.configure(api_key=api_key)
+                client = genai.Client(api_key=api_key)
                 try:
-                    models = genai.list_models()
+                    models = client.models.list()
                     found = False
                     st.write("### Available Generative Models:")
                     for m in models:
@@ -113,7 +113,7 @@ def main():
             st.error("Please provide a valid Gemini API Key.")
             return
 
-        genai.configure(api_key=api_key)
+        client = genai.Client(api_key=api_key)
         
         try:
             # Generate SSML
@@ -121,7 +121,6 @@ def main():
                 ssml_text = text_input
             else:
                 with st.spinner(f"Generating {emotion} SSML..."):
-                    model = genai.GenerativeModel("gemini-2.0-flash")
                     prompt = f"""
                     You are an SSML expert for Windows SAPI 5.
                     Convert this text: "{text_input}"
@@ -133,7 +132,10 @@ def main():
                     - Output RAW XML only. No markdown block.
                     - Do not wrap in ```xml ... ```.
                     """
-                    response = model.generate_content(prompt)
+                    response = client.models.generate_content(
+                        model="gemini-2.0-flash",
+                        contents=prompt
+                    )
                     ssml_text = response.text.strip()
                     # Clean up if markdown is returned despite instructions
                     if ssml_text.startswith("```"):

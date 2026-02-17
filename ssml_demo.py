@@ -94,13 +94,15 @@ def main():
                 try:
                     models = client.models.list()
                     found = False
-                    st.write("### Available Generative Models:")
+                    st.write("### Available Models:")
                     for m in models:
-                        if 'generateContent' in m.supported_generation_methods:
-                            st.write(f"- `{m.name}`")
+                        # Show models that support generateContent
+                        model_name = str(m.name) if hasattr(m, 'name') else str(m)
+                        if 'gemini' in model_name.lower():
+                            st.write(f"- `{model_name}`")
                             found = True
                     if not found:
-                        st.warning("No models found that support `generateContent`.")
+                        st.warning("No Gemini models found.")
                 except Exception as e:
                     st.error(f"Error listing models: {e}")
 
